@@ -156,6 +156,17 @@ class TSHGameAssetManager(QObject):
                 self.LoadGameAssets(i+1)
                 break
 
+
+    def SetGameFromLocalId(self, gameid):
+        if len(self.games.keys()) == 0:
+            return
+
+    # Acting as a startgg tournament for now
+        for i, game in enumerate(self.games.values()):
+            if str(game.get("smashgg_game_id")) == str(gameid):
+                self.LoadGameAssets(i+1)
+                break
+
     def SetGameFromChallongeId(self, gameid):
         if len(self.games.keys()) == 0:
             return

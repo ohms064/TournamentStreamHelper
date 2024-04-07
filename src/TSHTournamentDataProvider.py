@@ -12,6 +12,7 @@ from .TSHGameAssetManager import TSHGameAssetManager, TSHGameAssetManagerSignals
 from .TournamentDataProvider.TournamentDataProvider import TournamentDataProvider
 from .TournamentDataProvider.ChallongeDataProvider import ChallongeDataProvider
 from .TournamentDataProvider.StartGGDataProvider import StartGGDataProvider
+from .TournamentDataProvider.LocalDataProvider import LocalDataProvider
 import json
 from loguru import logger
 
@@ -62,6 +63,9 @@ class TSHTournamentDataProvider:
         elif "challonge.com" in self.provider.url:
             TSHGameAssetManager.instance.SetGameFromChallongeId(
                 self.provider.videogame)
+        elif "localmatch" in self.provider.url:
+            TSHGameAssetManager.instance.SetGameFromLocalId(self.provider.videogame)
+            pass
         else:
             logger.error("Unsupported provider...")
 
@@ -74,6 +78,9 @@ class TSHTournamentDataProvider:
                 url, self.threadPool, self)
         elif url is not None and "challonge.com" in url:
             TSHTournamentDataProvider.instance.provider = ChallongeDataProvider(
+                url, self.threadPool, self)
+        elif url is not None and "localmatch" in url:
+            TSHTournamentDataProvider.instance.provider = LocalDataProvider(
                 url, self.threadPool, self)
         else:
             logger.error("Unsupported provider...")
@@ -112,7 +119,8 @@ class TSHTournamentDataProvider:
         okButton = QPushButton("OK")
         validators = [
             QRegularExpression("start.gg/tournament/[^/]+/event[s]?/[^/]+"),
-            QRegularExpression("challonge.com/.+")
+            QRegularExpression("challonge.com/.+"),
+            QRegularExpression("localmatch"),
         ]
 
         def validateText():
@@ -150,6 +158,10 @@ class TSHTournamentDataProvider:
                     "(.*challonge.com/[^/]*/[^/]*)", url)
                 if matches:
                     url = matches.group(0)
+
+            if "localmatch" in url:
+                if url.endswith("/") or url.endswith("\\"):
+                    url = url[:-1]
 
             SettingsManager.Set("TOURNAMENT_URL", url)
             TSHTournamentDataProvider.instance.SetTournament(
