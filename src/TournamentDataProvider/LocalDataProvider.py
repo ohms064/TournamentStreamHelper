@@ -20,14 +20,14 @@ class LocalDataProvider(TournamentDataProvider):
     def GetMatch(self, setId, progress_callback=None):
         path = f"{self.url}/current_match.json"
         result = {}
-        with open(path, "r", encoding='utf-8') as file:
+        with open(path, "r", encoding='utf-8-sig') as file:
             result = json.load(file)
         return result[setId]
 
     def GetMatches(self, getFinished=False, progress_callback=None):
         path = f"{self.url}/matches.json"
         result = {}
-        with open(path, "r", encoding='utf-8') as file:
+        with open(path, "r", encoding='utf-8-sig') as file:
             result = json.load(file)
         return result
 
