@@ -1,4 +1,5 @@
 import os
+import re
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
 from qtpy.QtCore import *
@@ -11,6 +12,8 @@ from .TSHGameAssetManager import TSHGameAssetManager
 from .TSHBracketView import TSHBracketView
 from .TSHBracketWidget import TSHBracketWidget
 from .TSHTournamentDataProvider import TSHTournamentDataProvider
+from .TSHCommentaryWidget import TSHCommentaryWidget
+from .Workers import Worker
 
 import logging
 log = logging.getLogger('werkzeug')
@@ -18,10 +21,12 @@ log.setLevel(logging.ERROR)
 
 
 class WebServerActions(QThread):
-    def __init__(self, parent=None, scoreboard=None, stageWidget=None) -> None:
+    def __init__(self, parent=None, scoreboard=None, stageWidget=None, commentaryWidget: TSHCommentaryWidget=None) -> None:
         super().__init__(parent)
         self.scoreboard = scoreboard
         self.stageWidget = stageWidget
+        self.commentaryWidget = commentaryWidget
+        self.threadPool = QThreadPool()
 
     def program_state(self):
         return StateManager.state
@@ -206,7 +211,7 @@ class WebServerActions(QThread):
         if losers is not None:
             self.scoreboard.GetScoreboard(scoreboard).signals.ChangeSetData.emit(
                 orjson.loads(
-                    orjson.dumps({'team' + str(team) + 'losers': bool(losers)})
+                    orjson.dumps({'team' + str(team) + 'losers': False if losers.lower() == 'false' else True})
                 )
             )
         return "OK"
@@ -217,6 +222,15 @@ class WebServerActions(QThread):
             "player": player,
             "data": data
         })
+        return "OK"
+
+    def set_commentary_data(self, index, data):
+        logger.info(self.commentaryWidget)
+        index = int(index) - 1
+        if index < 0:
+            return "ERROR : index can't be lower than 1"
+        self.commentaryWidget.ChangeCommDataSignal.emit(index, data)
+
         return "OK"
 
     def get_characters(self):
@@ -353,6 +367,22 @@ class WebServerActions(QThread):
             provider = TSHTournamentDataProvider.instance.GetProvider()
             sets = provider.GetMatches(getFinished=False)
             return sets
+        
+    def get_match(self, setId=None):
+        setId = int(setId)
+        provider = TSHTournamentDataProvider.instance.GetProvider()
+        loop, result = QEventLoop(), None
+
+        def handle_result(data):
+            nonlocal result
+            result = data
+            loop.quit()
+
+        worker = Worker(provider.GetMatch, setId=setId)
+        worker.signals.result.connect(handle_result)
+        self.threadPool.start(worker)
+        loop.exec_()
+        return result
 
     def load_player_from_tag(self, scoreboard, tag, team, player, no_mains=False):
         result = self.scoreboard.GetScoreboard(scoreboard).LoadPlayerFromTag(str(tag), int(team), int(player), no_mains)
@@ -360,3 +390,44 @@ class WebServerActions(QThread):
             return "OK"
         else:
             return "ERROR"
+
+    def load_commentator_from_tag(self, index, tag, no_mains=False):
+        index = int(index) - 1
+        if index < 0:
+            return "ERROR : index can't be lower than 1" 
+        result = self.commentaryWidget.LoadCommFromTagSignal.emit(index, tag, no_mains)
+
+    def load_tournament(self, url=None):
+        logger.error(f"URL PROVIDED: {url}")
+        if url is None or  url == "":
+            TSHTournamentDataProvider.instance.signals.tournament_url_update.emit(None)
+            return "OK"
+        else:
+            validators = [
+                QRegularExpression("start.gg/tournament/[^/]+/event[s]?/[^/]+"),
+                QRegularExpression("challonge.com/.+")
+            ]
+
+            for validator in validators:
+                    match = validator.match(url).capturedTexts()
+                    if len(match) > 0:
+                        continue
+            
+            if "start.gg" in url:
+                matches = re.match(
+                    "(.*start.gg/tournament/[^/]*/event[s]?/[^/]*)", url)
+                if matches:
+                    url = matches.group(0)
+
+                    # Some URLs in startgg have eventS but the API doesn't work with that format
+                    url = url.replace("/events/", "/event/")
+            if "challonge" in url:
+                matches = re.match(
+                    "(.*challonge.com/[^/]*/[^/]*)", url)
+                if matches:
+                    url = matches.group(0)
+
+            SettingsManager.Set("TOURNAMENT_URL", url)
+            TSHTournamentDataProvider.instance.signals.tournament_url_update.emit(url)
+            
+            return "OK"

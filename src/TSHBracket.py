@@ -151,8 +151,10 @@ class Bracket():
                         if int(k) < 0 and abs(int(k)) % 2 == 1:
                             targetIdW = 1
                         _set.winNextSlot = targetIdW
-                    except Exception as e:
-                        logger.error(e)
+                    except KeyError as e:
+                        logger.warning(f"Bracket KeyError: {e}")
+                    except:
+                        logger.error(traceback.format_exc())
                     try:
                         if abs(roundNum) % 4 == 0:
                             _set.loseNext = self.rounds[str(-int(2*(roundNum)))][(
@@ -173,8 +175,10 @@ class Bracket():
                             targetIdL = j % 2
 
                         _set.loseNextSlot = targetIdL
-                    except Exception as e:
-                        logger.error(e)
+                    except KeyError as e:
+                        logger.warning(f"Bracket KeyError: {e}")
+                    except:
+                        logger.error(traceback.format_exc())
             else:
                 for j, _set in enumerate(round):
                     try:
@@ -187,6 +191,8 @@ class Bracket():
                         if int(k) < 0 and abs(int(k)) % 2 == 1:
                             targetIdW = 1
                         _set.winNextSlot = targetIdW
+                    except KeyError as e:
+                        logger.warning(f"Bracket KeyError: {e}")
                     except Exception as e:
                         logger.error(e)
 
@@ -323,3 +329,12 @@ class Bracket():
         if roundNumber < 0:
             roundNumber += losersCutout[0]
             return TSHLocaleHelper.matchNames.get("losers_round").format(abs(roundNumber))
+
+    @staticmethod
+    def GetTopN(round_number: int, bracket_size: int):
+        print("Input:", round_number, bracket_size)
+
+        if round_number >= 0:
+            return bracket_size // (2 ** (round_number-1))
+        else:
+            return math.ceil(bracket_size / (2 ** (abs(round_number-1)/2)))

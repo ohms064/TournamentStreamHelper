@@ -6,6 +6,10 @@ from qtpy.QtWidgets import *
 import requests
 import os
 import traceback
+import time
+from pathlib import Path
+
+from .TSHDirHelper import TSHResolve
 from .TSHDictHelper import deep_get
 from ..TournamentDataProvider import TournamentDataProvider
 from .TSHLocaleHelper import TSHLocaleHelper
@@ -33,26 +37,32 @@ class TSHCountryHelper(QObject):
     def UpdateCountriesFile(self):
         class DownloaderThread(QThread):
             def run(self):
-                try:
-                    url = 'https://raw.githubusercontent.com/dr5hn/countries-states-cities-database/master/countries%2Bstates%2Bcities.json'
-                    r = requests.get(url, allow_redirects=True)
+                out_file = Path('./assets/countries+states+cities.json')
 
-                    open(
-                        './assets/countries+states+cities.json.tmp',
-                        'wb'
-                    ).write(r.content)
+                if out_file.exists():
+                    modtime = out_file.stat().st_mtime
+                    # Less than 12 hours since file was written to?
+                    # Skip so there aren't redundant downloads
+                    if time.time() - modtime <= (12 * 60 * 60):
+                        logger.debug("Skipping countries file download")
+                        TSHCountryHelper.LoadCountries()
+                        return
+
+                try:
+                    url = 'https://raw.githubusercontent.com/dr5hn/countries-states-cities-database/refs/heads/master/json/countries%2Bstates%2Bcities.json'
+                    r = requests.get(url, allow_redirects=True)
+                    tmp_file = Path('./assets/countries+states+cities.json.tmp')
+
+                    with tmp_file.open(mode='wb') as f:
+                        f.write(r.content)
 
                     try:
                         # Test if downloaded JSON is valid
-                        json.load(
-                            open('./assets/countries+states+cities.json.tmp'))
+                        with tmp_file.open(mode='r', encoding='utf-8') as f:
+                            json.load(f)
 
                         # Remove old file, overwrite with new one
-                        os.remove('./assets/countries+states+cities.json')
-                        os.rename(
-                            './assets/countries+states+cities.json.tmp',
-                            './assets/countries+states+cities.json'
-                        )
+                        tmp_file.replace(out_file)
 
                         logger.info("Countries file updated")
                         TSHCountryHelper.LoadCountries()
@@ -60,7 +70,7 @@ class TSHCountryHelper(QObject):
                         logger.error("Countries files download failed")
                 except Exception as e:
                     logger.error(
-                        "Could not update /assets/countries+states+cities.json: "+str(e))
+                        "Could not update countries+states+cities.json: "+str(e))
         downloaderThread = DownloaderThread(self)
         downloaderThread.start()
 
@@ -113,20 +123,30 @@ class TSHCountryHelper(QObject):
                     export_name = c["translations"][re.split(
                         "-|_", locale)[0]]
 
+                ccode = c.get("iso2") if not c.get("iso2").isdigit() else "".join([
+                    word[0] for word in re.split(r'\s+|-', c.get("name"))])
+
                 TSHCountryHelper.countries[c["iso2"]] = {
                     "name": export_name,
                     "display_name": display_name,
                     "en_name": c.get("name"),
-                    "code": c.get("iso2"),
+                    "code": ccode,
                     "latitude": c.get("latitude"),
                     "longitude": c.get("longitude"),
                     "states": {}
                 }
 
                 for s in c.get("states", []):
+                    if s.get("state_code") is None:
+                        continue
+
+                    scode = s.get("state_code") if not s.get("state_code").isdigit() else "".join([
+                        word[0] for word in re.split(r'\s+|-', s.get("name").strip()) if len(word) > 0])
+
                     TSHCountryHelper.countries[c["iso2"]]["states"][s["state_code"]] = {
                         "name": s.get("name"),
-                        "code": s.get("state_code"),
+                        "code": scode,
+                        "original_code": s.get("state_code"),
                         "latitude": s.get("latitude"),
                         "longitude": s.get("longitude"),
                     }
@@ -169,13 +189,15 @@ class TSHCountryHelper(QObject):
             for flag in AdditionalFlags:
                 filename = os.path.basename(flag)
                 ext = filename.split(".")[-1]
-                if len(filename.removesuffix("."+ext)) >= 3: # Remove flags with less than 3 characters
+                #  Remove flags with less than 3 characters
+                if len(filename.removesuffix("."+ext)) >= 3:
                     AdditionalFlagsFiltered.append(flag)
             AdditionalFlags = AdditionalFlagsFiltered
 
             if AdditionalFlags:
                 separator = QStandardItem()
-                separator.setData("    " + QApplication.translate("app", "Custom Flags").upper() + "    ", Qt.ItemDataRole.EditRole)
+                separator.setData("    " + QApplication.translate("app",
+                                  "Custom Flags").upper() + "    ", Qt.ItemDataRole.EditRole)
                 separator.setEnabled(False)
                 separator.setSelectable(False)
                 TSHCountryHelper.countryModel.appendRow(separator)
@@ -184,12 +206,12 @@ class TSHCountryHelper(QObject):
                 item = QStandardItem()
                 item.setIcon(QIcon(f"./user_data/additional_flag/{flag}"))
                 item.setData({
-                                "name": flag[:-4],
-                                "display_name": flag[:-4],
-                                "en_name": flag[:-4],
-                                "code": flag[:-4],
-                                "asset": f'./user_data/additional_flag/{flag}'
-                             }, Qt.ItemDataRole.UserRole)
+                    "name": flag[:-4],
+                    "display_name": flag[:-4],
+                    "en_name": flag[:-4],
+                    "code": flag[:-4],
+                    "asset": f'./user_data/additional_flag/{flag}'
+                }, Qt.ItemDataRole.UserRole)
                 item.setData(flag[:-4], Qt.ItemDataRole.EditRole)
                 TSHCountryHelper.countryModel.appendRow(item)
         except:
@@ -200,6 +222,8 @@ class TSHCountryHelper(QObject):
         # State explicit?
         # Normalize parts of city string
         split = city.replace(" - ", ",").split(",")
+
+        logger.debug(f"Finding State from city string [{city}]")
 
         for part in split[::-1]:
             part = part.strip()
@@ -216,7 +240,9 @@ class TSHCountryHelper(QObject):
                     None
                 )
             if state is not None:
-                return state["code"]
+                logger.debug(
+                    f"State was explicit: [{city}] -> [{part}] = {state}")
+                return state["original_code"]
 
         # No, so get by City
         for part in split[::-1]:
@@ -226,9 +252,8 @@ class TSHCountryHelper(QObject):
                 TSHCountryHelper.remove_accents_lower(part), None)
 
             if state is not None:
+                logger.debug(f"Got state from city name: [{city}] -> [{part}] = {state}")
                 return state
-
-        
 
         return None
 

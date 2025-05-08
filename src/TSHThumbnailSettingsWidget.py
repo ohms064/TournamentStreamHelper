@@ -15,6 +15,7 @@ from .SettingsManager import *
 from .TSHGameAssetManager import *
 from .Workers import Worker
 from .Helpers.TSHDictHelper import deep_get, deep_set
+from .Helpers.TSHDirHelper import TSHResolve
 
 
 class PreviewWidget(QWidget):
@@ -81,7 +82,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
         self.setWidget(self.widget)
         self.widget.setLayout(QVBoxLayout())
 
-        self.settings = uic.loadUi("src/layout/TSHThumbnailSettings.ui")
+        self.settings = uic.loadUi(TSHResolve("src/layout/TSHThumbnailSettings.ui"))
         self.widget.layout().addWidget(self.settings)
 
         # SET DEFAULTS
@@ -174,7 +175,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
                 config["filename"] = t
                 self.templates.append(config)
             except Exception as e:
-                logger.error(traceback.format_exc()) 
+                logger.error(traceback.format_exc())
 
         for t in self.templates:
             self.templateSelect.addItem(
@@ -339,22 +340,22 @@ class TSHThumbnailSettingsWidget(QDockWidget):
         )
 
         self.noSeparatorAngle.valueChanged.connect(lambda:
-                                                   TSHThumbnailSettingsWidget.SaveSettings(
-                                                       self,
-                                                       key=f"game.{TSHGameAssetManager.instance.selectedGame.get('codename')}.noSeparatorAngle",
-                                                       val=self.noSeparatorAngle.value(),
-                                                       generatePreview=True
-                                                   )
-                                                   )
+            TSHThumbnailSettingsWidget.SaveSettings(
+                self,
+                key=f"game.{TSHGameAssetManager.instance.selectedGame.get('codename')}.noSeparatorAngle",
+                val=self.noSeparatorAngle.value(),
+                generatePreview=True
+            )
+        )
 
         self.noSeparatorDistance.valueChanged.connect(lambda:
-                                                      TSHThumbnailSettingsWidget.SaveSettings(
-                                                          self,
-                                                          key=f"game.{TSHGameAssetManager.instance.selectedGame.get('codename')}.noSeparatorDistance",
-                                                          val=self.noSeparatorDistance.value(),
-                                                          generatePreview=True
-                                                      )
-                                                      )
+            TSHThumbnailSettingsWidget.SaveSettings(
+                self,
+                key=f"game.{TSHGameAssetManager.instance.selectedGame.get('codename')}.noSeparatorDistance",
+                val=self.noSeparatorDistance.value(),
+                generatePreview=True
+            )
+        )
 
         self.flipSeparators.stateChanged.connect(lambda val: [
             TSHThumbnailSettingsWidget.SaveSettings(
@@ -516,7 +517,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
 
         self.GeneratePreview()
 
-        tmp_path = "./tmp/thumbnail"
+        tmp_path = TSHResolve("tmp/thumbnail")
         tmp_file = f"{tmp_path}/template.jpg"
         Path(tmp_path).mkdir(parents=True, exist_ok=True)
 
@@ -812,7 +813,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
                 self.GeneratePreview()
         except Exception as e:
             logger.error("Error saving font")
-            logger.error(traceback.format_exc()) 
+            logger.error(traceback.format_exc())
 
     def ColorPicker(self, button, key):
         try:
@@ -823,13 +824,13 @@ class TSHThumbnailSettingsWidget(QDockWidget):
                 self.SaveSettings(f"{key}", val=color)
                 self.updateFromSettings()
         except Exception as e:
-            logger.error(traceback.format_exc()) 
+            logger.error(traceback.format_exc())
 
     def SaveSettings(self, key, val, generatePreview=False):
         try:
             SettingsManager.Set(f"thumbnail_config.{key}", val)
         except Exception as e:
-            logger.error(traceback.format_exc()) 
+            logger.error(traceback.format_exc())
 
         if generatePreview:
             self.GeneratePreview()
@@ -908,7 +909,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             except Exception as e:
                 self.DisplayErrorMessage(traceback.format_exc())
 
-    def GeneratePreviewDo(self, progress_callback):
+    def GeneratePreviewDo(self, progress_callback, cancel_event):
         with self.lock:
             try:
                 if self.thumbnailGenerationThread.activeThreadCount() > 1:
@@ -922,7 +923,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
                 pass
 
     def DisplayErrorMessage(self, e):
-        logger.error(traceback.format_exc()) 
+        logger.error(traceback.format_exc())
         msgBox = QMessageBox()
         msgBox.setWindowIcon(QIcon('assets/icons/icon.png'))
         msgBox.setWindowTitle(QApplication.translate(
@@ -948,7 +949,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
                 if key == "base_files":
                     continue
                 # Skip stage icon assets
-                if isinstance(val.get("type"), list) and "stage_icon" in val.get("type"):
+                if isinstance(val.get("type"), list) and ("stage_icon" in val.get("type") or "variant_icon" in val.get("type")):
                     continue
                 if val.get("name"):
                     self.selectRenderType.addItem(val.get("name"), key)
