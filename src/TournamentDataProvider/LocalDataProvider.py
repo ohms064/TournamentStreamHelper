@@ -14,27 +14,27 @@ class LocalDataProvider(TournamentDataProvider):
     def GetEntrants(self):
         return
 
-    def GetTournamentData(self, progress_callback=None):
+    def GetTournamentData(self, progress_callback=None, cancel_event=None):
         return {}
 
-    def GetMatch(self, setId, progress_callback=None):
+    def GetMatch(self, setId, progress_callback=None, cancel_event=None):
         path = f"{self.url}/current_match.json"
         result = {}
         with open(path, "r", encoding='utf-8-sig') as file:
             result = json.load(file)
         return result[setId]
 
-    def GetMatches(self, getFinished=False, progress_callback=None):
+    def GetMatches(self, getFinished=False, progress_callback=None, cancel_event=None):
         path = f"{self.url}/matches.json"
         result = {}
         with open(path, "r", encoding='utf-8-sig') as file:
             result = json.load(file)
         return result
 
-    def GetStations(self, progress_callback=None):
+    def GetStations(self, progress_callback=None, cancel_event=None):
         return ([])
 
-    def GetStreamQueue(self, streamName, progress_callback=None):
+    def GetStreamQueue(self, streamName=None, progress_callback=None, cancel_event=None):
         return {}
 
     def GetStreamMatchId(self, streamName):
@@ -58,10 +58,10 @@ class LocalDataProvider(TournamentDataProvider):
     def GetPlayerHistoryStandings(self, playerId, playerNumber, gameType):
         pass
 
-    def GetTournamentPhases(self, progress_callback=None):
+    def GetTournamentPhases(self, progress_callback=None, cancel_event=None):
         pass
 
-    def GetTournamentPhaseGroup(self, id, progress_callback=None):
+    def GetTournamentPhaseGroup(self, id, progress_callback=None, cancel_event=None):
         pass
 
     def GetStandings(self, playerNumber):
@@ -71,5 +71,5 @@ class LocalDataProvider(TournamentDataProvider):
         pass
 
     # give me a list of objects that contain a "id" property
-    def GetFutureMatchesList(self, sets: object, progress_callback=None):
+    def GetFutureMatchesList(self, sets: object, progress_callback=None, cancel_event=None):
         pass
