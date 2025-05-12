@@ -1200,7 +1200,7 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../TSHScoreboardPlayerWidget.py" line="83"/>
-        <location filename="../TSHScoreboardPlayerWidget.py" line="881"/>
+        <location filename="../TSHScoreboardPlayerWidget.py" line="880"/>
         <source>Save new player</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1223,7 +1223,7 @@ p, li { white-space: pre-wrap; }
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardPlayerWidget.py" line="878"/>
+        <location filename="../TSHScoreboardPlayerWidget.py" line="877"/>
         <source>Update player</source>
         <translation type="unfinished"></translation>
     </message>
